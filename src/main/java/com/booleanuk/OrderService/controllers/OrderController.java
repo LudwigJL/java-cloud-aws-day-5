@@ -2,8 +2,11 @@ package com.booleanuk.OrderService.controllers;
 
 
 import com.booleanuk.OrderService.models.Order;
+import com.booleanuk.OrderService.repositories.OrderRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.tools.jconsole.JConsoleContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -21,8 +24,8 @@ import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 import java.util.List;
-
 @RestController
+
 @RequestMapping("orders")
 public class OrderController {
     private SqsClient sqsClient;
@@ -32,6 +35,8 @@ public class OrderController {
     private String queueUrl;
     private String topicArn;
     private String eventBusName;
+
+    @Autowired OrderRepository orderRepository;
 
     public OrderController() {
         this.sqsClient = SqsClient.builder().build();
@@ -56,8 +61,14 @@ public class OrderController {
         List<Message> messages = sqsClient.receiveMessage(receiveRequest).messages();
 
         for (Message message : messages) {
+
             try {
-                Order order = this.objectMapper.readValue(message.body(), Order.class);
+                String extJsondata = this.objectMapper.readTree(message.body()).get("Message").asText();
+                Order order = this.objectMapper.readValue(extJsondata, Order.class);
+
+                System.out.println("Order");
+                System.out.println(order);
+
                 this.processOrder(order);
 
                 DeleteMessageRequest deleteRequest = DeleteMessageRequest.builder()
@@ -66,6 +77,7 @@ public class OrderController {
                         .build();
 
                 sqsClient.deleteMessage(deleteRequest);
+
             } catch (JsonProcessingException e) {
 //                e.printStackTrace();
             }
@@ -107,6 +119,10 @@ public class OrderController {
     }
 
     private void processOrder(Order order) {
-        System.out.println(order.toString());
+        int getTotalAmount = order.getAmount() * order.getQuantity();
+        order.setProcessed(true);
+        order.setTotal(getTotalAmount);
+
+        this.orderRepository.save(order);
     }
 }
