@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.eventbridge.EventBridgeClient;
 import software.amazon.awssdk.services.eventbridge.model.PutEventsRequest;
@@ -116,6 +117,17 @@ public class OrderController {
 //            e.printStackTrace();
             return ResponseEntity.status(500).body("Failed to create order");
         }
+    }
+
+    @PutMapping("{id}")
+    public ResponseEntity<Order> updateOrder(@PathVariable int id, @RequestBody Order order){
+        Order orderToUpdate = this.orderRepository.findById(id).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
+
+        orderToUpdate.setProduct(order.getProduct());
+        orderToUpdate.setQuantity(order.getQuantity());
+        orderToUpdate.setAmount(order.getAmount());
+
+        return new ResponseEntity<Order>(this.orderRepository.save(orderToUpdate), HttpStatus.CREATED);
     }
 
     private void processOrder(Order order) {
